@@ -41,7 +41,7 @@ func init() {
 	// Fetching network type from environment variable with a default value
 	network = os.Getenv("NIMIQ_NETWORK")
 	if network == "" {
-		network = "testnet" // Assuming 'testnet' as default, adjust as needed
+		network = "testnet"
 	}
 
 	log.Printf("Nimiq Node URL: %s", nimiqNodeUrl)
@@ -61,16 +61,15 @@ func getServingPort() string {
 }
 
 func checkConsensus(client *rpc.Client) bool {
-	const maxAttempts = 3
 	successfulChecks := 0
 
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	for {
 		consensus, err := client.IsConsensusEstablished()
 		if err != nil {
-			log.Printf("Attempt %d: Error checking consensus: %v\n", attempt, err)
+			log.Printf("Error checking consensus: %v\n", err)
 			log.Println("Waiting 60 seconds before retrying...")
 			time.Sleep(60 * time.Second) // Sleep for 60 seconds
-			return false                 // Immediately return on error
+			continue                     // Retry indefinitely on error
 		}
 
 		if consensus {
@@ -80,21 +79,18 @@ func checkConsensus(client *rpc.Client) bool {
 			}
 		} else {
 			log.Printf("Consensus not established. Restarting check...")
-			return false // Exit if consensus is not established at any attempt
+			successfulChecks = 0 // Reset count if consensus fails in between
 		}
 
-		// Sleep only if not on the last attempt and consensus is not yet verified
-		if attempt < maxAttempts {
-			time.Sleep(5 * time.Second)
+		// Only proceed after achieving successful consensus checks
+		if successfulChecks >= 3 {
+			log.Printf("Consensus stability verified. Proceeding...")
+			return true
 		}
-	}
 
-	if successfulChecks == maxAttempts {
-		log.Printf("Consensus stability verified. Proceeding...")
-		return true
+		// Sleep for a short interval between checks
+		time.Sleep(5 * time.Second)
 	}
-
-	return false
 }
 
 func updateEpochNumberGauge(client *rpc.Client) {
@@ -391,7 +387,7 @@ func checkAndHandleValidatorStatus(client *rpc.Client, address string) bool {
 }
 
 func main() {
-	const appVersion = "1.0.0"
+	const appVersion = "1.0.1"
 	client := rpc.NewClient()
 
 	log.Printf("Starting Nimiq Validator Activator v%s on port %s\n", appVersion, servingPort)
