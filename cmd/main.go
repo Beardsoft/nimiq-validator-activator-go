@@ -19,6 +19,7 @@ var (
 	faucetURL    string
 	network      string
 	nimiqNodeUrl string
+	activation   string
 	servingPort  = getServingPort()
 )
 
@@ -34,14 +35,22 @@ func init() {
 
 	// Fetching faucet URL from environment variable with a default value
 	faucetURL = os.Getenv("FAUCET_URL")
-	if faucetURL == "" {
+	if faucetURL == "testnet" {
 		faucetURL = "https://faucet.pos.nimiq-testnet.com/tapit"
+	} else {
+		faucetURL = ""
 	}
 
 	// Fetching network type from environment variable with a default value
 	network = os.Getenv("NIMIQ_NETWORK")
 	if network == "" {
-		network = "testnet"
+		network = "mainnet"
+	}
+
+	// Activation enabled
+	activation = os.Getenv("ACTIVATION")
+	if activation == "" {
+		activation = "true"
 	}
 
 	log.Printf("Nimiq Node URL: %s", nimiqNodeUrl)
@@ -191,6 +200,7 @@ func activateValidator(client *rpc.Client, address string) bool {
 	}
 
 	log.Println("Activating Validator")
+
 	rawTx, err := client.SendNewValidatorTransaction(address, address, sigKey, voteKey, address, "", 500, "+0")
 	if err != nil {
 		log.Println("Failed to create new validator transaction:", err)
@@ -348,7 +358,11 @@ func checkAndHandleValidatorStatus(client *rpc.Client, address string) bool {
 	details, err := client.GetValidatorByAddress(address)
 	if err != nil {
 		log.Println("Validator not active. Needs activation:", err)
-		activateValidator(client, address)
+		if activation == "true" {
+			activateValidator(client, address)
+		} else {
+			log.Println("Activation disabled. Skipping activation.")
+		}
 		return false
 	}
 
@@ -358,7 +372,11 @@ func checkAndHandleValidatorStatus(client *rpc.Client, address string) bool {
 	// Check if the validator is retired or jailed and handle accordingly
 	if details.Retired {
 		log.Printf("Validator is retired. Needs reactivation.")
-		reActivateValidator(client, address)
+		if activation == "true" {
+			reActivateValidator(client, address)
+		} else {
+			log.Println("Reactivation disabled. Skipping reactivation.")
+		}
 		return false
 	}
 
@@ -387,10 +405,10 @@ func checkAndHandleValidatorStatus(client *rpc.Client, address string) bool {
 }
 
 func main() {
-	const appVersion = "1.0.1"
+	const appVersion = "1.0.2"
 	client := rpc.NewClient()
 
-	log.Printf("Starting Nimiq Validator Activator v%s on port %s\n", appVersion, servingPort)
+	log.Printf("Starting Nimiq Validator monitor v%s on port %s\n", appVersion, servingPort)
 
 	go func() {
 		http.Handle("/metrics", promhttp.Handler())

@@ -11,6 +11,7 @@ services:
       - PROMETHEUS_PORT=8000
       - FAUCET_URL=https://faucet.pos.nimiq-testnet.com/tapit
       - NIMIQ_NETWORK=testnet
+      - ACTIVATION=false
     volumes:
       - "/opt/nimiq/validator/secrets:/keys" # mount your validator keys here
     ports:
